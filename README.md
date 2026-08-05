@@ -60,9 +60,27 @@ The list table also gains a **Featured** column (★ or —) so you can see the
 current state at a glance, and it is what the Quick Edit script reads to pre-check
 the box.
 
-Core only offers its own sticky checkbox for the built-in `post` type — it is
-hardcoded in `WP_Posts_List_Table::inline_edit()` — so these are additions rather
-than core behaviour being extended.
+These controls submit core's own `sticky` field, which is the important detail:
+`edit_post()` and `bulk_edit_posts()` both stick and unstick from that field for
+*any* post type, gated on capability rather than post type. WordPress simply never
+renders the control outside the built-in `post` type, because
+`WP_Posts_List_Table::inline_edit()` hardcodes it. So the plugin supplies the
+missing markup and lets core do the saving — no save handler, no JavaScript.
+
+Exclusivity is enforced on core's `post_stuck` action, so it applies however a post
+became featured: publish box, Quick Edit, Bulk Edit, REST, or a direct
+`stick_post()` call. Blog posts are excluded, so your normal sticky posts are never
+touched.
+
+Two caveats inherited from core:
+
+- The publish-box checkbox only renders in the **classic editor**;
+  `post_submitbox_misc_actions` has no block editor equivalent. For a CPT using the
+  block editor, Quick Edit and Bulk Edit are the way in.
+- `edit_post()` gates sticky changes on `edit_others_posts` **and**
+  `publish_posts`; `bulk_edit_posts()` gates on `edit_others_posts`. An Author-role
+  user editing their own post will find the checkbox silently ignored. Core behaves
+  the same way for blog posts.
 
 One wrinkle worth knowing in Bulk Edit: because exclusivity still applies, setting
 **Featured** on several items of the *same* post type in one action leaves only the
@@ -172,7 +190,6 @@ templates/
 assets/
   css/rotator.css
   js/rotator.js
-  js/sticky-quick-edit.js
 ```
 
 ## Relationship to elementor-post-types
@@ -209,15 +226,11 @@ live Elementor editor. Worth verifying first:
 - The manual widget's repeater: row titles, and whether the picker list is long
   enough for the site's content
 
-`get_slides()` on the manual widget and the Quick Edit / Bulk Edit save routing
-are both covered by ad-hoc tests against stubbed WordPress functions — valid
-picks, drafts, non-public types, deleted posts, malformed settings, ordering,
-column placement, nonce routing and the bulk exclusivity interaction. None of it
+`get_slides()` on the manual widget and the exclusivity enforcer are both covered
+by ad-hoc tests against stubbed WordPress functions — valid picks, drafts,
+non-public types, deleted posts, malformed settings, ordering, column placement,
+one-per-type across several types, and blog stickies being left alone. None of it
 is committed as a suite yet.
-
-The Quick Edit script wraps `inlineEditPost.edit`, which is still the only hook
-WordPress offers for populating custom inline fields. It is stable but undocumented,
-so it is worth re-checking after a major WP release.
 
 ## License
 

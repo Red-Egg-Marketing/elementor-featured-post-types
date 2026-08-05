@@ -34,19 +34,14 @@ class Sticky_Posts {
 	private static $instance = null;
 
 	/**
-	 * Nonce action.
-	 */
-	const NONCE_ACTION = 're_featured_sticky';
-
-	/**
-	 * Nonce field name.
-	 */
-	const NONCE_FIELD = 're_featured_sticky_nonce';
-
-	/**
 	 * Checkbox field name.
+	 *
+	 * Core's own. edit_post() and bulk_edit_posts() both stick/unstick from a
+	 * field called `sticky` for ANY post type -- WordPress simply never renders
+	 * the control outside the built-in `post` type. Reusing the name means core
+	 * does the saving and we only supply the missing UI.
 	 */
-	const FIELD = 're_featured_sticky';
+	const FIELD = 'sticky';
 
 	/**
 	 * Get the singleton.
@@ -68,7 +63,7 @@ class Sticky_Posts {
 	private function __construct() {
 
 		add_action( 'post_submitbox_misc_actions', [ $this, 'render_checkbox' ] );
-		add_action( 'save_post', [ $this, 'save_checkbox' ], 10, 2 );
+		add_action( 'post_stuck', [ $this, 'enforce_exclusive' ] );
 	}
 
 	/**
@@ -112,11 +107,10 @@ class Sticky_Posts {
 			? $post_type_obj->labels->singular_name
 			: $post->post_type;
 
-		wp_nonce_field( self::NONCE_ACTION, self::NONCE_FIELD );
 		?>
 		<div class="misc-pub-section misc-pub-re-featured">
 			<label>
-				<input type="checkbox" name="<?php echo esc_attr( self::FIELD ); ?>" value="1" <?php checked( is_sticky( $post->ID ) ); ?> />
+				<input type="checkbox" name="<?php echo esc_attr( self::FIELD ); ?>" value="sticky" <?php checked( is_sticky( $post->ID ) ); ?> />
 				<?php
 					printf(
 						/* translators: %s Singular post type label. */
@@ -133,52 +127,46 @@ class Sticky_Posts {
 	}
 
 	/**
-	 * Persist the checkbox to the sticky_posts option.
+	 * Keep one featured item per post type.
 	 *
-	 * Bails unless our own nonce is present, so REST writes, quick edit, bulk
-	 * edit and programmatic saves can never silently unstick a post.
+	 * Hooked to core's post_stuck action, which fires from stick_post() however
+	 * the post became sticky -- publish box, Quick Edit, Bulk Edit, REST, or a
+	 * direct stick_post() call. One hook covers every entry point.
 	 *
-	 * @param int      $post_id Post ID.
-	 * @param \WP_Post $post    Post object.
+	 * unstick_post() fires post_unstuck rather than post_stuck, so there is no
+	 * recursion to guard against here.
+	 *
+	 * @param int $post_id Post that just became sticky.
 	 */
-	public function save_checkbox( $post_id, $post ) {
+	public function enforce_exclusive( $post_id ) {
 
-		if ( ! isset( $_POST[ self::NONCE_FIELD ] ) ) {
+		$post_type = get_post_type( $post_id );
+
+		// Never touch the blog's own sticky posts.
+		if ( ! $post_type || ! in_array( $post_type, self::get_supported_post_types(), true ) ) {
 			return;
 		}
 
-		if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST[ self::NONCE_FIELD ] ) ), self::NONCE_ACTION ) ) {
+		if ( ! apply_filters( 're_featured_sticky_exclusive', true, $post_type ) ) {
 			return;
 		}
 
-		if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
-			return;
+		foreach ( self::get_sticky_ids( $post_type ) as $sibling_id ) {
+			if ( (int) $sibling_id !== (int) $post_id ) {
+				unstick_post( $sibling_id );
+			}
 		}
-
-		if ( wp_is_post_revision( $post_id ) ) {
-			return;
-		}
-
-		if ( ! current_user_can( 'edit_post', $post_id ) ) {
-			return;
-		}
-
-		if ( ! $post instanceof \WP_Post || ! in_array( $post->post_type, self::get_supported_post_types(), true ) ) {
-			return;
-		}
-
-		self::set_featured( $post_id, isset( $_POST[ self::FIELD ] ), $post->post_type );
 	}
 
 	/**
 	 * Set or clear the featured flag on a post.
 	 *
-	 * The single edit screen, Quick Edit and Bulk Edit all funnel through here so
-	 * the exclusivity rule lives in exactly one place.
+	 * Provided for programmatic use. The admin screens do not call this -- they
+	 * submit core's `sticky` field and let WordPress do the writing.
 	 *
 	 * @param int         $post_id   Post ID.
 	 * @param bool        $featured  Whether the post should be featured.
-	 * @param string|null $post_type Post type, looked up when omitted.
+	 * @param string|null $post_type Unused; retained for backward compatibility.
 	 */
 	public static function set_featured( $post_id, $featured, $post_type = null ) {
 
@@ -188,25 +176,12 @@ class Sticky_Posts {
 			return;
 		}
 
-		if ( ! $featured ) {
+		if ( $featured ) {
+			// Exclusivity is applied by enforce_exclusive() on post_stuck.
+			stick_post( $post_id );
+		} else {
 			unstick_post( $post_id );
-			return;
 		}
-
-		if ( null === $post_type ) {
-			$post_type = get_post_type( $post_id );
-		}
-
-		// Clear siblings first, so the rotator always resolves exactly one per type.
-		if ( $post_type && apply_filters( 're_featured_sticky_exclusive', true, $post_type ) ) {
-			foreach ( self::get_sticky_ids( $post_type ) as $sibling_id ) {
-				if ( (int) $sibling_id !== (int) $post_id ) {
-					unstick_post( $sibling_id );
-				}
-			}
-		}
-
-		stick_post( $post_id );
 	}
 
 	/**
