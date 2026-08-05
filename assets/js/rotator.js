@@ -3,10 +3,17 @@
  *
  *   [====----] Case Study   [--------] Whitepaper   [--------] Event
  *
- * Swiper owns the slide transition and the autoplay clock. The countdown bars are
- * driven by CSS width transitions rather than Swiper's `autoplayTimeLeft` event,
- * because that event only exists in Swiper 8.4+ and Elementor bundles older
- * versions depending on release.
+ * The advance timer is ours, not Swiper's. Two reasons:
+ *
+ * 1. Swiper's autoplay pause/resume API changed shape across majors, and
+ *    Elementor ships different majors depending on version and experiment
+ *    flags. Calling pause() and then start() leaves autoplay flagged as
+ *    running-but-paused, so it never fires again -- a permanent stall.
+ * 2. The countdown bar and the slide advance have to agree to the
+ *    millisecond. Sharing one timer makes desync impossible rather than
+ *    merely unlikely.
+ *
+ * Swiper still owns the transition, looping and touch gestures.
  */
 ( function () {
 	'use strict';
@@ -46,8 +53,10 @@
 			speed = 500;
 		}
 
-		// One slide has nothing to rotate through.
 		var single = tabs.length < 2;
+		var reduceMotion =
+			window.matchMedia &&
+			window.matchMedia( '(prefers-reduced-motion: reduce)' ).matches;
 
 		var swiper = new window.Swiper( container, {
 			effect: 'fade',
@@ -56,13 +65,14 @@
 			loop: ! single,
 			allowTouchMove: ! single,
 			autoHeight: true,
-			autoplay: single
-				? false
-				: {
-						delay: delay,
-						disableOnInteraction: false
-				  }
+			autoplay: false
 		} );
+
+		// --- state ---------------------------------------------------------
+
+		var timer = null;
+		var remaining = delay;
+		var paused = false;
 
 		function activeIndex() {
 			return typeof swiper.realIndex === 'number'
@@ -77,14 +87,28 @@
 			);
 		}
 
-		/**
-		 * Reset every bar, then run the active one from 0 to 100%.
-		 *
-		 * The width is zeroed with transitions off and the element is reflowed
-		 * before the transition is restored -- otherwise the browser coalesces
-		 * both writes and the bar snaps straight to full.
-		 */
-		function setActive( index ) {
+		function clearTimer() {
+			if ( timer ) {
+				window.clearTimeout( timer );
+				timer = null;
+			}
+		}
+
+		function scheduleAdvance( ms ) {
+			clearTimer();
+
+			if ( single || reduceMotion || paused ) {
+				return;
+			}
+
+			timer = window.setTimeout( function () {
+				swiper.slideNext();
+			}, ms );
+		}
+
+		// --- bar painting --------------------------------------------------
+
+		function paintTabs( index ) {
 			tabs.forEach( function ( tab, i ) {
 				var fill = tab.querySelector( '.refp-rotator__tab-fill' );
 				var isActive = i === index;
@@ -92,71 +116,112 @@
 				tab.classList.toggle( 'is-active', isActive );
 				tab.setAttribute( 'aria-selected', isActive ? 'true' : 'false' );
 
-				if ( ! fill ) {
-					return;
-				}
-
-				fill.style.transition = 'none';
-				fill.style.width = '0%';
-
-				if ( isActive && ! single ) {
-					void fill.offsetWidth;
-					fill.style.transition = 'width ' + delay + 'ms linear';
-					fill.style.width = '100%';
+				if ( fill ) {
+					fill.style.transition = 'none';
+					fill.style.width = '0%';
 				}
 			} );
 		}
 
+		/**
+		 * Run the active bar from its current width to full over `ms`.
+		 *
+		 * The reflow is required: without it the browser coalesces the width
+		 * reset and the target width into one paint, and the bar snaps to full.
+		 */
+		function runBar( index, ms ) {
+			var fill = fillOf( index );
+
+			if ( ! fill || reduceMotion ) {
+				return;
+			}
+
+			void fill.offsetWidth;
+			fill.style.transition = 'width ' + ms + 'ms linear';
+			fill.style.width = '100%';
+		}
+
+		/**
+		 * Stop the active bar where it is and report the time left.
+		 *
+		 * @return {number} Milliseconds remaining in this slide.
+		 */
+		function freezeBar( index ) {
+			var fill = fillOf( index );
+
+			if ( ! fill ) {
+				return delay;
+			}
+
+			var track = fill.parentNode;
+			var width = parseFloat( window.getComputedStyle( fill ).width );
+			var full = track ? track.offsetWidth : 0;
+
+			fill.style.transition = 'none';
+
+			if ( ! full || isNaN( width ) ) {
+				return delay;
+			}
+
+			fill.style.width = width + 'px';
+
+			var done = Math.min( 1, Math.max( 0, width / full ) );
+
+			return Math.max( 0, Math.round( delay * ( 1 - done ) ) );
+		}
+
+		/**
+		 * Reset the cycle for a slide: repaint tabs, restart the bar, requeue.
+		 */
+		function startCycle( index, ms ) {
+			paintTabs( index );
+			remaining = ms;
+
+			if ( paused ) {
+				return;
+			}
+
+			runBar( index, ms );
+			scheduleAdvance( ms );
+		}
+
+		// --- wiring --------------------------------------------------------
+
 		swiper.on( 'slideChangeTransitionStart', function () {
-			setActive( activeIndex() );
+			startCycle( activeIndex(), delay );
 		} );
 
-		if ( config.pauseOnHover && ! single ) {
+		if ( config.pauseOnHover && ! single && ! reduceMotion ) {
 			root.addEventListener( 'mouseenter', function () {
-				var fill = fillOf( activeIndex() );
-
-				if ( fill ) {
-					var frozen = window.getComputedStyle( fill ).width;
-					fill.style.transition = 'none';
-					fill.style.width = frozen;
+				if ( paused ) {
+					return;
 				}
 
-				if ( swiper.autoplay ) {
-					if ( swiper.autoplay.pause ) {
-						swiper.autoplay.pause();
-					} else if ( swiper.autoplay.stop ) {
-						swiper.autoplay.stop();
-					}
-				}
+				paused = true;
+				clearTimer();
+				remaining = freezeBar( activeIndex() );
 			} );
 
 			root.addEventListener( 'mouseleave', function () {
-				var fill = fillOf( activeIndex() );
-
-				if ( fill && fill.parentNode.offsetWidth ) {
-					var done =
-						parseFloat( window.getComputedStyle( fill ).width ) /
-						fill.parentNode.offsetWidth;
-					var remaining = Math.max( 0, delay * ( 1 - done ) );
-
-					void fill.offsetWidth;
-					fill.style.transition = 'width ' + remaining + 'ms linear';
-					fill.style.width = '100%';
+				if ( ! paused ) {
+					return;
 				}
 
-				if ( swiper.autoplay ) {
-					if ( swiper.autoplay.resume ) {
-						swiper.autoplay.resume();
-					} else if ( swiper.autoplay.start ) {
-						swiper.autoplay.start();
-					}
-				}
+				paused = false;
+				runBar( activeIndex(), remaining );
+				scheduleAdvance( remaining );
 			} );
 		}
 
 		tabs.forEach( function ( tab ) {
 			tab.addEventListener( 'click', function () {
 				var target = parseInt( tab.dataset.index, 10 ) || 0;
+
+				if ( target === activeIndex() ) {
+					// No slide change will fire, so restart this slide's cycle.
+					startCycle( target, delay );
+					return;
+				}
 
 				if ( swiper.slideToLoop ) {
 					swiper.slideToLoop( target );
@@ -166,17 +231,11 @@
 			} );
 		} );
 
-		var reduceMotion =
-			window.matchMedia &&
-			window.matchMedia( '(prefers-reduced-motion: reduce)' ).matches;
-
 		if ( reduceMotion ) {
-			if ( swiper.autoplay && swiper.autoplay.stop ) {
-				swiper.autoplay.stop();
-			}
 			root.classList.add( 'refp-rotator--static' );
+			paintTabs( activeIndex() );
 		} else {
-			setActive( activeIndex() );
+			startCycle( activeIndex(), delay );
 		}
 
 		root.dataset.refpReady = '1';

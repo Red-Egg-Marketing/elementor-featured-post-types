@@ -190,6 +190,8 @@ templates/
 assets/
   css/rotator.css
   js/rotator.js
+tests/
+  rotator.test.js                   jsdom + fake clock, run with `npm test`
 ```
 
 ## Relationship to elementor-post-types
@@ -226,7 +228,20 @@ live Elementor editor. Worth verifying first:
 - The manual widget's repeater: row titles, and whether the picker list is long
   enough for the site's content
 
-`get_slides()` on the manual widget and the exclusivity enforcer are both covered
+The rotator's state machine has a real test suite:
+
+```bash
+npm install && npm test
+```
+
+It runs `assets/js/rotator.js` in jsdom with a controllable clock and a stub
+Swiper, covering self-advance and loop-around, hover pausing and resuming from the
+remaining time, clicking a tab mid-cycle, clicking the already-active tab, repeated
+events not double-scheduling, single-slide, reduced motion, and pause-on-hover
+disabled. `node_modules` is dev-only — the plugin ships no compiled assets and has
+no build step.
+
+`get_slides()` on the manual widget and the exclusivity enforcer are covered
 by ad-hoc tests against stubbed WordPress functions — valid picks, drafts,
 non-public types, deleted posts, malformed settings, ordering, column placement,
 one-per-type across several types, and blog stickies being left alone. None of it

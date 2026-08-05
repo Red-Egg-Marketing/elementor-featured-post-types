@@ -1,0 +1,12 @@
+{
+  "name": "elementor-featured-post-types",
+  "version": "1.2.0",
+  "private": true,
+  "description": "Dev-only tooling. The plugin itself has no build step and ships no compiled assets.",
+  "scripts": {
+    "test": "node tests/rotator.test.js"
+  },
+  "devDependencies": {
+    "jsdom": "^24.0.0"
+  }
+}
