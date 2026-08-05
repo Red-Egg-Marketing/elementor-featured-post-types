@@ -202,10 +202,14 @@
 			return;
 		}
 
-		window.elementorFrontend.hooks.addAction(
-			'frontend/element_ready/re-featured-post-types.default',
-			function ( $scope ) {
-				initAll( $scope && $scope[ 0 ] ? $scope[ 0 ] : null );
+		[ 're-featured-post-types', 're-featured-selected-posts' ].forEach(
+			function ( widget ) {
+				window.elementorFrontend.hooks.addAction(
+					'frontend/element_ready/' + widget + '.default',
+					function ( $scope ) {
+						initAll( $scope && $scope[ 0 ] ? $scope[ 0 ] : null );
+					}
+				);
 			}
 		);
 	} );

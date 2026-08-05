@@ -74,9 +74,12 @@ final class Plugin {
 	 */
 	public function register_widgets( $widgets_manager ) {
 
-		require_once RE_FEATURED_DIR . 'includes/class-widget.php';
+		require_once RE_FEATURED_DIR . 'includes/abstract-rotator-widget.php';
+		require_once RE_FEATURED_DIR . 'includes/class-widget-post-types.php';
+		require_once RE_FEATURED_DIR . 'includes/class-widget-selected-posts.php';
 
-		$widgets_manager->register( new Widget() );
+		$widgets_manager->register( new Widget_Post_Types() );
+		$widgets_manager->register( new Widget_Selected_Posts() );
 	}
 
 	/**
