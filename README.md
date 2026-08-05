@@ -1,8 +1,16 @@
 # Elementor Featured Post Types
 
-An Elementor widget that shows one featured post per post type, rotated one at a
-time, with a labelled countdown tab for each. Adds sticky support to custom post
-types so editors can choose what gets featured.
+Two Elementor widgets that rotate featured posts one at a time, with a labelled
+countdown tab for each. They share an identical panel and rotator; they differ
+only in how the list of posts is decided.
+
+| Widget | How posts are chosen |
+|--------|----------------------|
+| **Featured Post Types** | One per post type, resolved from a sticky flag set by editors |
+| **Featured Posts (Manual)** | Hand-picked, in the order you list them, from any public post type |
+
+Adds sticky support to custom post types so editors can choose what gets
+featured.
 
 Built for the Red Egg "Featured Insights" pattern: a large panel that cycles
 between a Case Study, a Whitepaper and an Event, with a progress bar under each
@@ -25,16 +33,90 @@ nothing else — it will not fatal.
 
 ## Usage
 
-1. Add the **Featured Post Types** widget to a page (General category).
-2. Under **Query**, pick the post types to include. One item is shown per type,
-   in the order listed.
-3. Feature an item by editing it and ticking **Feature this {Post Type}** in the
-   Publish box.
+Both widgets live in the **General** category.
 
-Only one item per post type can be featured at a time — ticking a new one clears
+### Featured Post Types
+
+Editors control what appears; the page just says which types to include.
+
+1. Under **Query**, pick the post types. One item is shown per type, in the order
+   listed.
+2. Feature an item using any of the three controls below.
+
+Only one item per post type can be featured at a time — featuring a new one clears
 the previous. If nothing is featured for a type, the widget falls back to that
 type's most recent published post, so a tab is never empty. Disable that with
 **Fall Back To Latest**.
+
+#### Where editors set the featured flag
+
+| Where | Control |
+|-------|---------|
+| Single edit screen | **Feature this {Post Type}** checkbox in the Publish box |
+| Posts list → Quick Edit | **Featured** checkbox |
+| Posts list → Bulk Edit | **Featured** dropdown: no change / featured / not featured |
+
+The list table also gains a **Featured** column (★ or —) so you can see the
+current state at a glance, and it is what the Quick Edit script reads to pre-check
+the box.
+
+These controls submit core's own `sticky` field, which is the important detail:
+`edit_post()` and `bulk_edit_posts()` both stick and unstick from that field for
+*any* post type, gated on capability rather than post type. WordPress simply never
+renders the control outside the built-in `post` type, because
+`WP_Posts_List_Table::inline_edit()` hardcodes it. So the plugin supplies the
+missing markup and lets core do the saving — no save handler, no JavaScript.
+
+Exclusivity is enforced on core's `post_stuck` action, so it applies however a post
+became featured: publish box, Quick Edit, Bulk Edit, REST, or a direct
+`stick_post()` call. Blog posts are excluded, so your normal sticky posts are never
+touched.
+
+Two caveats inherited from core:
+
+- The publish-box checkbox only renders in the **classic editor**;
+  `post_submitbox_misc_actions` has no block editor equivalent. For a CPT using the
+  block editor, Quick Edit and Bulk Edit are the way in.
+- `edit_post()` gates sticky changes on `edit_others_posts` **and**
+  `publish_posts`; `bulk_edit_posts()` gates on `edit_others_posts`. An Author-role
+  user editing their own post will find the checkbox silently ignored. Core behaves
+  the same way for blog posts.
+
+One wrinkle worth knowing in Bulk Edit: because exclusivity still applies, setting
+**Featured** on several items of the *same* post type in one action leaves only the
+last one featured. Across different post types they all stick. There is a note to
+that effect in the Bulk Edit panel.
+
+Use this when the rotator should stay current without anyone editing the page.
+
+### Featured Posts (Manual)
+
+The page controls what appears.
+
+1. Under **Posts**, add a row per item and pick the post. Any public post type is
+   selectable, and you can mix freely — two case studies and an event is fine.
+2. Optionally set a **Tab Label**. Left blank it uses the post type's singular
+   name, so two picks sharing a type produce two identical tabs; the override is
+   how you distinguish them.
+
+Picks that are later trashed, unpublished, or have their post type made
+non-public are skipped silently, so a stale pick degrades to a missing tab rather
+than a broken panel.
+
+Use this for a curated, deliberately ordered set — a campaign landing page rather
+than an evergreen index.
+
+#### A note on the post picker
+
+Elementor's free SELECT2 has no AJAX search, so the picker prefetches its list,
+capped at 100 posts per type. Raise or lower it with the
+`re_featured_picker_limit` filter. The list is only built in an editing context —
+on the frontend, saved picks are read back by ID, so nothing is queried for
+options nobody will see.
+
+If that cap ever becomes limiting, Elementor Pro's `query` control does proper
+autocomplete and would be a drop-in replacement for that one control, at the cost
+of a Pro dependency.
 
 ## How featuring works
 
@@ -87,7 +169,10 @@ Elementor loads them only on pages where the widget is present.
 | `re_featured_sticky_post_types` | filter | Post types that get the featured checkbox. Defaults to public types minus `post`, `page`, `attachment`. |
 | `re_featured_sticky_exclusive` | filter | Return `false` to allow more than one featured item per post type. |
 | `re_featured_slides` | filter | The resolved slide set, for reordering or injecting entries. |
-| `re_featured_post_type_options` | filter | Post types offered in the widget's Query control. |
+| `re_featured_post_type_options` | filter | Post types offered in the Featured Post Types query control. |
+| `re_featured_selected_slides` | filter | The resolved slide set for the manual widget. |
+| `re_featured_picker_limit` | filter | Posts listed per type in the manual picker. Default 100. |
+| `re_featured_picker_options` | filter | The manual picker's full option list. |
 
 ## Structure
 
@@ -96,12 +181,17 @@ elementor-featured-post-types.php   Bootstrap, constants, Elementor version guar
 includes/
   class-plugin.php                  Widget registration, asset handles
   class-sticky-posts.php            CPT sticky support, slide resolution
-  class-widget.php                  Controls and render
+  class-sticky-admin.php            Featured column, Quick Edit, Bulk Edit
+  abstract-rotator-widget.php       Shared controls, render, panel + tab markup
+  class-widget-post-types.php       Query section + one-per-post-type resolution
+  class-widget-selected-posts.php   Query section + hand-picked resolution
 templates/
   slide.php                         Per-slide markup
 assets/
   css/rotator.css
   js/rotator.js
+tests/
+  rotator.test.js                   jsdom + fake clock, run with `npm test`
 ```
 
 ## Relationship to elementor-post-types
@@ -113,6 +203,9 @@ schema support that this pattern never used.
 
 Deliberate differences:
 
+- **Shared base class.** Both widgets extend `Rotator_Widget`, which owns every
+  control except the query section plus all the rendering. Adding a third variant
+  means implementing four methods, not copying 650 lines.
 - **No skin layer.** The old code routed everything through Elementor skins,
   which implicitly prefix every control key with the skin ID — a steady source of
   settings lookups that silently resolve to `null`. Control IDs here are literal.
@@ -132,6 +225,27 @@ live Elementor editor. Worth verifying first:
 - `thumbnail_size` resolving to a real registered image size
 - Autoplay and bar sync across a full cycle, including the loop back to the first
   slide
+- The manual widget's repeater: row titles, and whether the picker list is long
+  enough for the site's content
+
+The rotator's state machine has a real test suite:
+
+```bash
+npm install && npm test
+```
+
+It runs `assets/js/rotator.js` in jsdom with a controllable clock and a stub
+Swiper, covering self-advance and loop-around, hover pausing and resuming from the
+remaining time, clicking a tab mid-cycle, clicking the already-active tab, repeated
+events not double-scheduling, single-slide, reduced motion, and pause-on-hover
+disabled. `node_modules` is dev-only — the plugin ships no compiled assets and has
+no build step.
+
+`get_slides()` on the manual widget and the exclusivity enforcer are covered
+by ad-hoc tests against stubbed WordPress functions — valid picks, drafts,
+non-public types, deleted posts, malformed settings, ordering, column placement,
+one-per-type across several types, and blog stickies being left alone. None of it
+is committed as a suite yet.
 
 ## License
 

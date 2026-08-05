@@ -1,11 +1,17 @@
 <?php
 /**
- * Featured Post Types widget.
+ * Shared base for the rotator widgets.
  *
- * A plain Widget_Base with no skin layer. The previous implementation routed
- * everything through Elementor skins, which meant every control key was
- * implicitly prefixed with the skin ID -- a constant source of settings keys
- * that silently resolve to null. Without skins, control IDs are literal.
+ * Both widgets render an identical panel and identical countdown tabs; the only
+ * thing that differs is how the slide list is resolved. Everything except that
+ * resolution lives here, so a new rotator variant is one small subclass rather
+ * than a fork of 650 lines.
+ *
+ * Subclasses supply:
+ *   get_name()              Elementor widget slug
+ *   get_title()             Editor label
+ *   register_query_section() The controls that decide which posts appear
+ *   get_slides()            [ post_id, post_type, label ] in display order
  *
  * @package RedEgg\FeaturedPostTypes
  */
@@ -24,30 +30,29 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Class Widget
+ * Class Rotator_Widget
  */
-class Widget extends Widget_Base {
+abstract class Rotator_Widget extends Widget_Base {
 
 	/**
-	 * Widget slug.
+	 * Resolve the slides to render.
 	 *
-	 * Deliberately distinct from the older plugin's `post-types` widget so both
-	 * can be active at once without Elementor rejecting a duplicate name.
+	 * @param array $settings Widget settings.
+	 * @return array List of [ post_id, post_type, label ].
+	 */
+	abstract protected function get_slides( $settings );
+
+	/**
+	 * Register the controls that decide which posts appear.
+	 */
+	abstract protected function register_query_section();
+
+	/**
+	 * Message shown in the editor when no slides resolve.
 	 *
 	 * @return string
 	 */
-	public function get_name() {
-		return 're-featured-post-types';
-	}
-
-	/**
-	 * Widget title.
-	 *
-	 * @return string
-	 */
-	public function get_title() {
-		return esc_html__( 'Featured Post Types', 'elementor-featured-post-types' );
-	}
+	abstract protected function get_empty_message();
 
 	/**
 	 * Widget icon.
@@ -65,15 +70,6 @@ class Widget extends Widget_Base {
 	 */
 	public function get_categories() {
 		return [ 'general' ];
-	}
-
-	/**
-	 * Search keywords.
-	 *
-	 * @return array
-	 */
-	public function get_keywords() {
-		return [ 'featured', 'insights', 'post', 'rotator', 'carousel', 'sticky' ];
 	}
 
 	/**
@@ -98,25 +94,35 @@ class Widget extends Widget_Base {
 	}
 
 	/**
-	 * Public post types as an id => label map for the control.
+	 * Whether we are in a context where expensive control option lists are worth
+	 * building.
 	 *
-	 * @return array
+	 * Elementor instantiates widgets and registers controls on the frontend too.
+	 * Prefetching post lists there would mean a query per public post type on
+	 * every page view, for options nobody will see -- and saved values are read
+	 * back by ID, so an empty option list on the frontend renders identically.
+	 *
+	 * @return bool
 	 */
-	private function get_post_type_options() {
+	protected function is_editing_context() {
 
-		$post_types = get_post_types( [ 'public' => true ], 'objects' );
-		$options    = [];
-
-		foreach ( $post_types as $post_type ) {
-
-			if ( 'attachment' === $post_type->name ) {
-				continue;
-			}
-
-			$options[ $post_type->name ] = $post_type->label;
+		if ( is_admin() || wp_doing_ajax() ) {
+			return true;
 		}
 
-		return apply_filters( 're_featured_post_type_options', $options );
+		if ( class_exists( '\Elementor\Plugin' ) ) {
+			$elementor = \Elementor\Plugin::$instance;
+
+			if ( isset( $elementor->editor ) && $elementor->editor->is_edit_mode() ) {
+				return true;
+			}
+
+			if ( isset( $elementor->preview ) && $elementor->preview->is_preview_mode() ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**
@@ -132,51 +138,9 @@ class Widget extends Widget_Base {
 	}
 
 	/**
-	 * Query controls.
-	 */
-	private function register_query_section() {
-
-		$this->start_controls_section(
-			'section_query',
-			[
-				'label' => esc_html__( 'Query', 'elementor-featured-post-types' ),
-				'tab'   => Controls_Manager::TAB_CONTENT,
-			]
-		);
-
-		$this->add_control(
-			'post_types',
-			[
-				'label'       => esc_html__( 'Post Types', 'elementor-featured-post-types' ),
-				'description' => esc_html__( 'One featured item is shown per post type, in the order listed here.', 'elementor-featured-post-types' ),
-				'type'        => Controls_Manager::SELECT2,
-				'multiple'    => true,
-				'label_block' => true,
-				'options'     => $this->get_post_type_options(),
-				'default'     => [ 'post' ],
-			]
-		);
-
-		$this->add_control(
-			'fallback_to_latest',
-			[
-				'label'        => esc_html__( 'Fall Back To Latest', 'elementor-featured-post-types' ),
-				'description'  => esc_html__( 'When nothing of a post type is featured, show its most recent item instead of skipping the tab.', 'elementor-featured-post-types' ),
-				'type'         => Controls_Manager::SWITCHER,
-				'label_on'     => esc_html__( 'Yes', 'elementor-featured-post-types' ),
-				'label_off'    => esc_html__( 'No', 'elementor-featured-post-types' ),
-				'return_value' => 'yes',
-				'default'      => 'yes',
-			]
-		);
-
-		$this->end_controls_section();
-	}
-
-	/**
 	 * Panel content controls.
 	 */
-	private function register_panel_section() {
+	protected function register_panel_section() {
 
 		$this->start_controls_section(
 			'section_panel',
@@ -272,7 +236,7 @@ class Widget extends Widget_Base {
 	/**
 	 * Rotator behaviour controls.
 	 */
-	private function register_rotator_section() {
+	protected function register_rotator_section() {
 
 		$this->start_controls_section(
 			'section_rotator',
@@ -321,7 +285,7 @@ class Widget extends Widget_Base {
 	/**
 	 * Panel style controls.
 	 */
-	private function register_panel_style_section() {
+	protected function register_panel_style_section() {
 
 		$this->start_controls_section(
 			'section_panel_style',
@@ -441,7 +405,7 @@ class Widget extends Widget_Base {
 	/**
 	 * Tab and countdown style controls.
 	 */
-	private function register_tabs_style_section() {
+	protected function register_tabs_style_section() {
 
 		$this->start_controls_section(
 			'section_tabs_style',
@@ -537,7 +501,7 @@ class Widget extends Widget_Base {
 	 * @param array $settings Widget settings.
 	 * @return string
 	 */
-	private function get_excerpt( $post_id, $settings ) {
+	protected function get_excerpt( $post_id, $settings ) {
 
 		$length = isset( $settings['excerpt_length'] ) ? absint( $settings['excerpt_length'] ) : 40;
 		$length = $length ? $length : 40;
@@ -557,7 +521,7 @@ class Widget extends Widget_Base {
 	 * @param string $tag Requested tag.
 	 * @return string
 	 */
-	private function get_title_tag( $tag ) {
+	protected function get_title_tag( $tag ) {
 
 		$allowed = [ 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'div', 'span', 'p' ];
 
@@ -571,14 +535,7 @@ class Widget extends Widget_Base {
 
 		$settings = $this->get_settings_for_display();
 
-		$post_types = isset( $settings['post_types'] ) ? $settings['post_types'] : [];
-
-		if ( ! is_array( $post_types ) ) {
-			$post_types = array_filter( [ $post_types ] );
-		}
-
-		$fallback = ( 'yes' === $settings['fallback_to_latest'] );
-		$slides   = Sticky_Posts::get_slides( $post_types, $fallback );
+		$slides = $this->get_slides( $settings );
 
 		if ( empty( $slides ) ) {
 			$this->render_empty_notice();
@@ -637,7 +594,7 @@ class Widget extends Widget_Base {
 	/**
 	 * Editor-only notice when nothing resolves.
 	 */
-	private function render_empty_notice() {
+	protected function render_empty_notice() {
 
 		if ( ! \Elementor\Plugin::instance()->editor->is_edit_mode() ) {
 			return;
@@ -645,7 +602,7 @@ class Widget extends Widget_Base {
 		?>
 		<div class="elementor-alert elementor-alert-warning">
 			<span class="elementor-alert-description">
-				<?php esc_html_e( 'No featured items found. Choose one or more post types under Query, then feature an item from its edit screen.', 'elementor-featured-post-types' ); ?>
+				<?php echo esc_html( $this->get_empty_message() ); ?>
 			</span>
 		</div>
 		<?php

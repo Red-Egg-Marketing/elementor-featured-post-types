@@ -49,6 +49,10 @@ final class Plugin {
 
 		Sticky_Posts::instance();
 
+		if ( is_admin() ) {
+			Sticky_Admin::instance();
+		}
+
 		add_action( 'elementor/widgets/register', [ $this, 'register_widgets' ] );
 		add_action( 'elementor/frontend/after_register_scripts', [ $this, 'register_scripts' ] );
 		add_action( 'elementor/frontend/after_register_styles', [ $this, 'register_styles' ] );
@@ -74,9 +78,12 @@ final class Plugin {
 	 */
 	public function register_widgets( $widgets_manager ) {
 
-		require_once RE_FEATURED_DIR . 'includes/class-widget.php';
+		require_once RE_FEATURED_DIR . 'includes/abstract-rotator-widget.php';
+		require_once RE_FEATURED_DIR . 'includes/class-widget-post-types.php';
+		require_once RE_FEATURED_DIR . 'includes/class-widget-selected-posts.php';
 
-		$widgets_manager->register( new Widget() );
+		$widgets_manager->register( new Widget_Post_Types() );
+		$widgets_manager->register( new Widget_Selected_Posts() );
 	}
 
 	/**

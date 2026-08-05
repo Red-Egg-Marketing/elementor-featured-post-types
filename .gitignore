@@ -1,0 +1,18 @@
+# Dev dependencies (tests only -- the plugin itself has no build step)
+node_modules/
+package-lock.json
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.sublime-*
+
+# Logs
+*.log
+debug.log
+
+# Build artefacts
+*.zip
+*.tar.gz
