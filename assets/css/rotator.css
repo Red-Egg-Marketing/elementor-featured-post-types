@@ -1,0 +1,135 @@
+/**
+ * Featured Post Types rotator.
+ * Mobile-first: single column until 768px.
+ */
+
+.refp-rotator {
+	position: relative;
+}
+
+.refp-rotator__eyebrow {
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	margin-bottom: 1.5rem;
+}
+
+.refp-rotator__swiper {
+	position: relative;
+	overflow: hidden;
+}
+
+.refp-rotator__panel {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 1.5rem;
+}
+
+.refp-rotator__media {
+	flex-basis: 100%;
+	min-width: 0;
+}
+
+.refp-rotator__media img {
+	display: block;
+	width: 100%;
+	height: auto;
+}
+
+.refp-rotator__content {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.refp-rotator__title {
+	margin: 0 0 1rem;
+}
+
+.refp-rotator__title a {
+	text-decoration: none;
+}
+
+.refp-rotator__excerpt {
+	margin: 0 0 1.5rem;
+}
+
+.refp-rotator__cta {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+	padding: 0.65rem 1.4rem;
+	border: 1px solid currentColor;
+	border-radius: 999px;
+	text-decoration: none;
+}
+
+/* Tabs and countdown ------------------------------------------------------ */
+
+.refp-rotator__tabs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 1.5rem;
+	margin-top: 2rem;
+}
+
+.refp-rotator__tab {
+	display: flex;
+	flex: 1 1 0;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 0.75rem;
+	min-width: 120px;
+	padding: 0;
+	border: 0;
+	background: none;
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+
+.refp-rotator__tab-track {
+	display: block;
+	width: 100%;
+	height: 3px;
+	background-color: rgba(0, 0, 0, 0.12);
+	overflow: hidden;
+}
+
+.refp-rotator__tab-fill {
+	display: block;
+	width: 0;
+	height: 100%;
+	background-color: currentColor;
+}
+
+.refp-rotator__tab-label {
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+}
+
+.refp-rotator__tab:focus-visible {
+	outline: 2px solid currentColor;
+	outline-offset: 4px;
+}
+
+/* Reduced motion: no rotation, all bars filled. */
+
+.refp-rotator--static .refp-rotator__tab-fill {
+	width: 100%;
+	transition: none !important;
+}
+
+@media screen and (min-width: 768px) {
+	.refp-rotator__panel {
+		flex-wrap: nowrap;
+		gap: 3rem;
+	}
+
+	.refp-rotator__media {
+		flex-basis: 62%;
+	}
+
+	.refp-rotator__tabs {
+		gap: 2.5rem;
+	}
+}
