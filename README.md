@@ -41,13 +41,33 @@ Editors control what appears; the page just says which types to include.
 
 1. Under **Query**, pick the post types. One item is shown per type, in the order
    listed.
-2. Feature an item by editing it and ticking **Feature this {Post Type}** in the
-   Publish box.
+2. Feature an item using any of the three controls below.
 
-Only one item per post type can be featured at a time — ticking a new one clears
+Only one item per post type can be featured at a time — featuring a new one clears
 the previous. If nothing is featured for a type, the widget falls back to that
 type's most recent published post, so a tab is never empty. Disable that with
 **Fall Back To Latest**.
+
+#### Where editors set the featured flag
+
+| Where | Control |
+|-------|---------|
+| Single edit screen | **Feature this {Post Type}** checkbox in the Publish box |
+| Posts list → Quick Edit | **Featured** checkbox |
+| Posts list → Bulk Edit | **Featured** dropdown: no change / featured / not featured |
+
+The list table also gains a **Featured** column (★ or —) so you can see the
+current state at a glance, and it is what the Quick Edit script reads to pre-check
+the box.
+
+Core only offers its own sticky checkbox for the built-in `post` type — it is
+hardcoded in `WP_Posts_List_Table::inline_edit()` — so these are additions rather
+than core behaviour being extended.
+
+One wrinkle worth knowing in Bulk Edit: because exclusivity still applies, setting
+**Featured** on several items of the *same* post type in one action leaves only the
+last one featured. Across different post types they all stick. There is a note to
+that effect in the Bulk Edit panel.
 
 Use this when the rotator should stay current without anyone editing the page.
 
@@ -143,6 +163,7 @@ elementor-featured-post-types.php   Bootstrap, constants, Elementor version guar
 includes/
   class-plugin.php                  Widget registration, asset handles
   class-sticky-posts.php            CPT sticky support, slide resolution
+  class-sticky-admin.php            Featured column, Quick Edit, Bulk Edit
   abstract-rotator-widget.php       Shared controls, render, panel + tab markup
   class-widget-post-types.php       Query section + one-per-post-type resolution
   class-widget-selected-posts.php   Query section + hand-picked resolution
@@ -151,6 +172,7 @@ templates/
 assets/
   css/rotator.css
   js/rotator.js
+  js/sticky-quick-edit.js
 ```
 
 ## Relationship to elementor-post-types
@@ -187,9 +209,15 @@ live Elementor editor. Worth verifying first:
 - The manual widget's repeater: row titles, and whether the picker list is long
   enough for the site's content
 
-`get_slides()` on the manual widget is covered by ad-hoc tests against stubbed
-posts (valid, draft, non-public type, deleted, malformed, ordering), but there is
-no test suite in the repo yet.
+`get_slides()` on the manual widget and the Quick Edit / Bulk Edit save routing
+are both covered by ad-hoc tests against stubbed WordPress functions — valid
+picks, drafts, non-public types, deleted posts, malformed settings, ordering,
+column placement, nonce routing and the bulk exclusivity interaction. None of it
+is committed as a suite yet.
+
+The Quick Edit script wraps `inlineEditPost.edit`, which is still the only hook
+WordPress offers for populating custom inline fields. It is stable but undocumented,
+so it is worth re-checking after a major WP release.
 
 ## License
 

@@ -167,14 +167,39 @@ class Sticky_Posts {
 			return;
 		}
 
-		if ( ! isset( $_POST[ self::FIELD ] ) ) {
+		self::set_featured( $post_id, isset( $_POST[ self::FIELD ] ), $post->post_type );
+	}
+
+	/**
+	 * Set or clear the featured flag on a post.
+	 *
+	 * The single edit screen, Quick Edit and Bulk Edit all funnel through here so
+	 * the exclusivity rule lives in exactly one place.
+	 *
+	 * @param int         $post_id   Post ID.
+	 * @param bool        $featured  Whether the post should be featured.
+	 * @param string|null $post_type Post type, looked up when omitted.
+	 */
+	public static function set_featured( $post_id, $featured, $post_type = null ) {
+
+		$post_id = absint( $post_id );
+
+		if ( ! $post_id ) {
+			return;
+		}
+
+		if ( ! $featured ) {
 			unstick_post( $post_id );
 			return;
 		}
 
+		if ( null === $post_type ) {
+			$post_type = get_post_type( $post_id );
+		}
+
 		// Clear siblings first, so the rotator always resolves exactly one per type.
-		if ( apply_filters( 're_featured_sticky_exclusive', true, $post->post_type ) ) {
-			foreach ( self::get_sticky_ids( $post->post_type ) as $sibling_id ) {
+		if ( $post_type && apply_filters( 're_featured_sticky_exclusive', true, $post_type ) ) {
+			foreach ( self::get_sticky_ids( $post_type ) as $sibling_id ) {
 				if ( (int) $sibling_id !== (int) $post_id ) {
 					unstick_post( $sibling_id );
 				}

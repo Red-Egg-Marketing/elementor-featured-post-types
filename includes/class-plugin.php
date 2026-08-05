@@ -49,6 +49,10 @@ final class Plugin {
 
 		Sticky_Posts::instance();
 
+		if ( is_admin() ) {
+			Sticky_Admin::instance();
+		}
+
 		add_action( 'elementor/widgets/register', [ $this, 'register_widgets' ] );
 		add_action( 'elementor/frontend/after_register_scripts', [ $this, 'register_scripts' ] );
 		add_action( 'elementor/frontend/after_register_styles', [ $this, 'register_styles' ] );

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Elementor Featured Post Types
  * Description: Two Elementor widgets that rotate featured posts with a labelled countdown tab for each -- one resolving a featured post per post type, one hand-picked. Adds sticky support to custom post types.
- * Version:     1.1.0
+ * Version:     1.2.0
  * Author:      Red Egg Marketing
  * Author URI:  https://redeggmarketing.com
  * Text Domain: elementor-featured-post-types
@@ -19,7 +19,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
 }
 
-define( 'RE_FEATURED_VERSION', '1.1.0' );
+define( 'RE_FEATURED_VERSION', '1.2.0' );
 define( 'RE_FEATURED_FILE', __FILE__ );
 define( 'RE_FEATURED_DIR', plugin_dir_path( __FILE__ ) );
 define( 'RE_FEATURED_URL', plugin_dir_url( __FILE__ ) );
@@ -48,6 +48,7 @@ function re_featured_bootstrap() {
 	}
 
 	require_once RE_FEATURED_DIR . 'includes/class-sticky-posts.php';
+	require_once RE_FEATURED_DIR . 'includes/class-sticky-admin.php';
 	require_once RE_FEATURED_DIR . 'includes/class-plugin.php';
 
 	\RedEgg\FeaturedPostTypes\Plugin::instance();
