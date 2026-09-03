@@ -21,7 +21,7 @@
 .refp-rotator__panel {
 	display: flex;
 	flex-wrap: wrap;
-	align-items: center;
+	align-items: start;
 	gap: 1.5rem;
 }
 
@@ -53,14 +53,25 @@
 	margin: 0 0 1.5rem;
 }
 
-.refp-rotator__cta {
+.refp-rotator .refp-rotator__panel .refp-rotator__content a {
+	text-decoration: none;
+}
+
+.refp-rotator .refp-rotator__panel .refp-rotator__content .refp-rotator__cta {
 	display: inline-flex;
 	align-items: center;
-	gap: 0.5rem;
-	padding: 0.65rem 1.4rem;
-	border: 1px solid currentColor;
-	border-radius: 999px;
-	text-decoration: none;
+}
+
+.refp-rotator__cta::after {
+	-webkit-mask: url("../img/chevron-right.svg") center / contain no-repeat;
+	mask: url("../img/chevron-right.svg") center / contain no-repeat;
+	content: "";
+	margin-bottom: -2px;
+	width: 9px;
+	height: 14px;
+	display: inline-block;
+	margin-left: 0.55em;
+	background-color: currentColor;
 }
 
 /* Tabs and countdown ------------------------------------------------------ */
@@ -72,7 +83,16 @@
 	margin-top: 2rem;
 }
 
-.refp-rotator__tab {
+/* Remove Global Button Styles */
+button.refp-rotator__tab {
+	all: unset;
+}
+button.refp-rotator__tab:hover, button.refp-rotator__tab:focus {
+	background-image: none;
+	border: none;
+}
+
+button.refp-rotator__tab {
 	display: flex;
 	flex: 1 1 0;
 	flex-direction: column;
@@ -127,6 +147,10 @@
 
 	.refp-rotator__media {
 		flex-basis: 62%;
+	}
+
+	.refp-rotator__content {
+		flex-basis: 38%;
 	}
 
 	.refp-rotator__tabs {

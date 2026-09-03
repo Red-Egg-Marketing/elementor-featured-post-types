@@ -53,9 +53,8 @@ $refp_title     = get_the_title( $refp_post_id );
 			<?php endif; ?>
 
 			<?php if ( 'yes' === $settings['show_cta'] && ! empty( $settings['cta_text'] ) ) : ?>
-				<a class="refp-rotator__cta" href="<?php echo esc_url( $refp_permalink ); ?>">
+				<a class="refp-rotator__cta elementor-button" href="<?php echo esc_url( $refp_permalink ); ?>">
 					<span><?php echo esc_html( $settings['cta_text'] ); ?></span>
-					<span class="refp-rotator__cta-icon" aria-hidden="true">&rsaquo;</span>
 					<span class="screen-reader-text">
 						<?php
 							printf(

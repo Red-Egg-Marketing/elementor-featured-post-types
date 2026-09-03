@@ -311,9 +311,6 @@ abstract class Rotator_Widget extends Widget_Base {
 					'size' => 62,
 					'unit' => '%',
 				],
-				'selectors'  => [
-					'{{WRAPPER}} .refp-rotator__media' => 'flex-basis: {{SIZE}}{{UNIT}};',
-				],
 			]
 		);
 
@@ -571,6 +568,7 @@ abstract class Rotator_Widget extends Widget_Base {
 				</div><!-- .swiper-wrapper -->
 			</div><!-- .refp-rotator__swiper -->
 
+			<?php if ( count( $slides ) > 1 ) : ?>
 			<div class="refp-rotator__tabs" role="tablist">
 				<?php foreach ( $slides as $index => $slide ) : ?>
 					<button
@@ -586,6 +584,7 @@ abstract class Rotator_Widget extends Widget_Base {
 					</button>
 				<?php endforeach; ?>
 			</div><!-- .refp-rotator__tabs -->
+			<? endif; ?>
 
 		</div><!-- .refp-rotator -->
 		<?php
